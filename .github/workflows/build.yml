@@ -124,6 +124,8 @@ jobs:
 
           cat > android/gradle.properties <<'PROPS'
           org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -Dfile.encoding=UTF-8
+          org.gradle.vfs.watch=false
+          org.gradle.daemon=false
           android.useAndroidX=true
           android.enableJetifier=true
           PROPS
@@ -136,11 +138,22 @@ jobs:
           class MainActivity : FlutterActivity()
           KOTLIN
 
+      - name: Clean Flutter
+        run: flutter clean
+
+      - name: Flutter Pub Get After Clean
+        run: flutter pub get
+
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-pub
+
+      - name: Verify APK
+        run: |
+          find build/app/outputs/flutter-apk -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: net-etisalat-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
