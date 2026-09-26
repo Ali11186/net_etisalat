@@ -142,30 +142,49 @@ jobs:
 
       - name: Build APK
         run: |
-          flutter build apk --release --no-pub || true
+          flutter build apk --release --no-pub
+
+      - name: Sign Release APK
+        run: |
+          set -e
+
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          KEYSTORE="$RUNNER_TEMP/net-etisalat-release.jks"
+
+          test -f "$APK"
+
+          keytool -genkeypair \
+            -keystore "$KEYSTORE" \
+            -storepass "android" \
+            -keypass "android" \
+            -alias "netetisalat" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Net Etisalat, OU=Android, O=Net Etisalat, L=Cairo, ST=Cairo, C=EG" \
+            -noprompt
+
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --ks-key-alias netetisalat \
+            --out "$APK" \
+            "$RUNNER_TEMP/aligned.apk"
+
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
 
       - name: Locate APK
-        if: always()
         run: |
-          echo "===== APK FILES ====="
-          find . -type f \( -name "*.apk" -o -name "*.aab" \) -print
-
-          echo "===== BUILD DIRECTORY ====="
-          find build -maxdepth 5 -type f 2>/dev/null | head -200 || true
-
-          echo "===== GRADLE OUTPUT ====="
-          find android -type f \( -name "*.apk" -o -name "*.aab" \) -print 2>/dev/null || true
+          find . -type f -name "*.apk" -print
 
       - name: Verify APK
         run: |
-          APK="$(find . -type f -name "*.apk" | head -1)"
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo "Found APK: $APK"
+          test -f build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload APK
         if: always()
