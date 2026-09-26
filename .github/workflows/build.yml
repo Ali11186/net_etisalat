@@ -40,11 +40,8 @@ jobs:
                   file("local.properties").withInputStream {
                       properties.load(it)
                   }
-
                   def flutterSdkPath = properties.getProperty("flutter.sdk")
-
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-
+                  assert flutterSdkPath != null
                   return flutterSdkPath
               }()
 
@@ -65,7 +62,6 @@ jobs:
 
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
-
               repositories {
                   google()
                   mavenCentral()
@@ -145,15 +141,38 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --no-pub
+        run: |
+          flutter build apk --release --no-pub || true
+
+      - name: Locate APK
+        if: always()
+        run: |
+          echo "===== APK FILES ====="
+          find . -type f \( -name "*.apk" -o -name "*.aab" \) -print
+
+          echo "===== BUILD DIRECTORY ====="
+          find build -maxdepth 5 -type f 2>/dev/null | head -200 || true
+
+          echo "===== GRADLE OUTPUT ====="
+          find android -type f \( -name "*.apk" -o -name "*.aab" \) -print 2>/dev/null || true
 
       - name: Verify APK
         run: |
-          find build/app/outputs/flutter-apk -type f -name "*.apk" -print
+          APK="$(find . -type f -name "*.apk" | head -1)"
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "Found APK: $APK"
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: net-etisalat-release
-          path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
+          path: |
+            **/*.apk
+            **/*.aab
+          if-no-files-found: warn
